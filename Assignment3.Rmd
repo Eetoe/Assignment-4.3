@@ -1,0 +1,267 @@
+---
+title: "Assignment3"
+author: "RF"
+date: "3/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#------ LLibrary & data ------
+library(ggplot2)
+library(dplyr)
+library(rethinking)
+library(mvtnorm)
+
+
+
+
+d = read.csv("Assignment3Data.csv")
+d = filter(d, Visit == 1, ASD == 1)
+d$sADOS = (d$ADOS-mean(d$ADOS))/sd(d$ADOS)
+d$svIQ = (d$VerbalIQ-mean(d$VerbalIQ))/sd(d$VerbalIQ)
+d$snIQ = (d$NonVerbalIQ-mean(d$NonVerbalIQ))/sd(d$NonVerbalIQ)
+d$ssIQ = (d$SocialIQ-mean(d$SocialIQ))/sd(d$SocialIQ)
+
+d3 = read.csv("Assignment3Data.csv")
+d3 = filter(d3, Visit == 1)
+d3 = d3[complete.cases(d3),] #Remove NAs
+d3$ASD = as.factor(d3$ASD)
+d3$sADOS = (d3$ADOS-mean(d$ADOS))/sd(d3$ADOS)
+d3$svIQ = (d3$VerbalIQ-mean(d3$VerbalIQ))/sd(d3$VerbalIQ)
+d3$snIQ = (d3$NonVerbalIQ-mean(d3$NonVerbalIQ))/sd(d3$NonVerbalIQ)
+d3$ssIQ = (d3$SocialIQ-mean(d3$SocialIQ))/sd(d3$SocialIQ)
+
+#------ Fixing the variables for each visit from old code -------
+#needs to be adjusted
+
+# #For these five variables select rows where VISIT==1
+# small_sub=subset(select_(d,"SUBJ", "VISIT", "ADOS", "nonverbalIQ", "verbalIQ"),VISIT==1)
+# 
+# #merge the dataframes. This gives double columns for the variables in question. Except for visit, columns with _old should be deleted and the new kept
+# datamerge3=merge(small_sub,datamerge2,by= c("SUBJ"), suffixes = c("","_old"))
+# 
+# #Remove unnecessary columns
+# datamerge3=datamerge3[,!names(datamerge3) %in% c("VISIT","ADOS_old","nonverbalIQ_old","verbalIQ_old")]
+# 
+# #rename VISITS_old to VISIT
+# datamerge3=dplyr::rename(datamerge3, VISIT =VISIT_old)
+
+```
+
+## Multivariate linear models
+
+In this assignment you will investigate the relation between different aspects of IQ and symptom severity in ASD (as measured by ADOS). The assignment is meant to make you practice on linear models, multiple predictors and interactions.
+
+The data you will use is the outcome of the psychological testing of the children you analyzed in methods 3.
+Data: https://www.dropbox.com/s/hom2qnmp9hyfwmu/Assignment3Data.csv?dl=0
+The data consists of ChildID, gender, age, diagnosis (ASD), symptom severity (ADOS), several aspects of IQ (NonVerbal/Perceptual,Verbal,Social) and the visit at which the tests were administered. The questions should be answered by focusing on visit 1.
+
+The questions you will have to answer are:
+
+1. Assess the relation between symptom severity and IQ (focus on visit 1 and children with ASD) and report the model, a plot of the model, a couple of lines describing the quality of the model and interpreting the results. P.S. Should you scale? P.P.S. Don't forget to motivate your priors. P.P.P.S. At least one plot for results and a plot for quality of each model (here and in the next questions) would be appreciated.
+1.1. Verbal IQ and ADOS
+1.2. Non Verbal IQ and ADOS
+1.3. Social IQ and ADOS
+
+```{r}
+#m11, verbal IQ
+m11 = map(
+  alist(ADOS ~ dnorm(mu, sigma),
+        mu <- a + b*VerbalIQ,
+        a ~ dnorm(21,14), #Low verbal IQ should lead to high ados, variation maxADOS*2/3
+        b ~ dnorm(0,7), #no slope, but vary by maxADOS/3 to let the model learn a slope
+        sigma ~ dunif(0,7) #The error term is from 0 to a third of max ados
+        ),
+  data = d)
+
+precis(m11, corr = T)
+
+vIQseq = seq(from = 0, to = 35, by = 1) #sequence of Verbal IQ
+mu11 = link(m11, data = data.frame(VerbalIQ = vIQseq), n=1e4) # Means of parameter values
+mu.HPDI.m11 = apply(mu11, 2, HPDI, prob = 0.89)#For shading around the line
+mu.m.m11 = apply(mu11, 2, mean) #For the line
+sim.ados11 = sim(m11, data = list(VerbalIQ = vIQseq), n=1e4) #Simulate posteriror sampling
+adospi11 = apply(sim.ados11, 2, PI, prob = 0.89) #For the uncertainty of the actual value of the coefs
+
+plot(ADOS ~ VerbalIQ, data = d, col = col.alpha(rangi2,0.5))
+lines(vIQseq, mu.m.m11)
+shade(mu.HPDI.m11, vIQseq)
+shade(adospi11, vIQseq)
+#abline(a = coef(m11)[1], b = coef(m11)[2])
+
+dens(sim.ados11, xlim = c(-5, 32), ylim = c(0,0.12), col = 'red', xlab = 'ADOS', ylab = 'Density')
+par(new = TRUE)
+dens(d$ADOS, xlim = c(-5, 32),ylim = c(0,0.12),xlab = 'ADOS', ylab = 'Density')
+
+
+#m12, nonverbal IQ
+m12 = map(
+  alist(ADOS ~ dnorm(mu, sigma),
+        mu <- a + b*NonVerbalIQ,
+        a ~ dnorm(21,14),
+        b ~ dnorm(0,7),
+        sigma ~ dunif(0,7)
+        ),
+  data = d)
+
+precis(m12, corr = T)
+
+nIQseq = seq(from = 0, to = 45, by = 1) #sequence of Verbal IQ
+mu12 = link(m12, data = data.frame(NonVerbalIQ = nIQseq), n=1e4) 
+mu.m.m12 = apply(mu12, 2, mean)
+mu.HPDI.m12 = apply(mu12, 2, HPDI, prob = 0.89)
+sim.ados12 = sim(m12, data = list(NonVerbalIQ = nIQseq), n=1e4)
+adospi12 = apply(sim.ados12, 2, PI, prob = 0.89)
+
+plot(ADOS ~ NonVerbalIQ, data = d, col = col.alpha(rangi2,0.5))
+lines(nIQseq, mu.m.m12)
+shade(mu.HPDI.m12, nIQseq)
+shade(adospi12, nIQseq)
+
+dens(sim.ados12, xlim = c(-5, 40), ylim = c(0,0.12), col = 'red', xlab = 'ADOS', ylab = 'Density')
+par(new = TRUE)
+dens(d$ADOS, xlim = c(-5, 40),ylim = c(0,0.12),xlab = 'ADOS', ylab = 'Density')
+
+#m13, social IQ
+m13 = map(
+  alist(ADOS ~ dnorm(mu, sigma),
+        mu <- a + b*SocialIQ,
+        a ~ dnorm(21,14),
+        b ~ dnorm(0,7),
+        sigma ~ dunif(0,7)
+        ),
+  data = d)
+
+precis(m13, corr = T)
+
+sIQseq = seq(from = 0, to = 110, by = 1) #sequence of Verbal IQ
+mu13 = link(m13, data = data.frame(SocialIQ = sIQseq), n=1e4)
+mu.m.m13 = apply(mu13, 2, mean)
+mu.HPDI.m13 = apply(mu13, 2, HPDI, prob = 0.89)
+sim.ados13 = sim(m13, data = list(SocialIQ = sIQseq), n=1e4)
+adospi13 = apply(sim.ados13, 2, PI, prob = 0.89)
+
+plot(ADOS ~ SocialIQ, data = d, col = col.alpha(rangi2,0.5))
+lines(sIQseq, mu.m.m13)
+shade(mu.HPDI.m13, sIQseq)
+shade(adospi13, sIQseq)
+
+dens(sim.ados13, xlim = c(-5, 47), ylim = c(0,0.12), col = 'red', xlab = 'ADOS', ylab = 'Density')
+par(new = TRUE)
+dens(d$ADOS, xlim = c(-5, 47),ylim = c(0,0.12),xlab = 'ADOS', ylab = 'Density')
+
+
+#------ GG plot (work in progress) -------
+
+ggplot(d, aes(VerbalIQ, ADOS))+ #ggplot version
+  geom_point(alpha=0.5)+
+  geom_abline(intercept = coef(m11)[1], slope = coef(m11)[2], size = 1, color = "red")
+# + geom_ribbon(d, aes(x=VerbalIQ, ymin = (coef(m11)[1]+coef(m11)[2]*VerbalIQ), ymax = y+ciVal), fill = "lightgrey")
+
+```
+
+
+
+2. Do the different aspects of IQ account for different portions of the variance in ADOS? 
+2.1. Does it make sense to have all IQ measures in the same model? First write a few lines answering the question and motivating your answer, including a discussion as to what happens when you put all of them in the same model. Then build a model following your answer. If your answer is "no", you are not free, you still have to answer: are there alternative ways of answering the question?
+2.2. Build the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+#Scatter plots of the IQ against one another
+plot(d$svIQ ~ d$ssIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Social IQ')
+plot(d$svIQ ~ d$snIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Nonverbal IQ')
+plot(d$snIQ ~ d$ssIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Nonverbal IQ', ylab = 'Social IQ')
+
+#Densities of the IQs
+dens(d$svIQ, xlim = c(-3,3), ylim = c(0,0.75), col = 'red', xlab = 'Z-scored IQs', ylab = 'Density')
+par(new = TRUE)
+dens(d$snIQ, xlim = c(-3, 3), ylim = c(0,0.75), col = 'blue', xlab = 'Z-scored IQs', ylab = 'Density')
+par(new = TRUE)
+dens(d$ssIQ, xlim = c(-3, 3), ylim = c(0,0.75), col = 'green', xlab = 'Z-scored IQs', ylab = 'Density')
+
+
+ggplot(data = d, aes(SocialIQ, NonVerbalIQ))+geom_point()+geom_smooth(method = lm)
+
+
+#Model
+m22 = map(
+  alist(sADOS ~ dnorm(mu, sigma),
+        mu <- a + b*svIQ + c*snIQ + d*ssIQ,
+        a ~ dnorm(0,4),
+        b ~ dnorm(0,4),
+        c ~ dnorm(0,4),
+        d ~ dnorm(0,4),
+        sigma ~ dunif(0,4)
+        ),
+  data = d)
+
+precis(m22)
+
+
+plot(precis(m22))
+
+
+sim22 = sim(m22, data = d, n=1e4) #Simulate posteriror sampling
+
+dens(sim22, xlim = c(-4, 4), ylim = c(0,0.6), col = 'red', xlab = 'Standardized ADOS', ylab = 'Density')
+par(new = TRUE)
+dens(d$sADOS, xlim = c(-4, 4),ylim = c(0,0.6),xlab = 'Standardized ADOS', ylab = 'Density')
+
+
+```
+
+
+3. Let's now include also the TD children. Does it make sense to ask whether IQ and ADOS are related? Motivate your answer. In any case, if you wanted to build a model to answer that question, which model would you build? Run the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+#Model
+m3 = map(
+  alist(sADOS ~ dnorm(mu, sigma),
+        mu <- a + b*svIQ + c*snIQ + d*ssIQ,
+        a ~ dnorm(0,4),
+        b ~ dnorm(0,4),
+        c ~ dnorm(0,4),
+        d ~ dnorm(0,4),
+        sigma ~ dunif(0,4)
+        ),
+  data = d3)
+
+precis(m3)
+
+
+plot(precis(m3))
+
+
+sim3 = sim(m3, data = d3, n=1e4) #Simulate posteriror sampling
+
+dens(sim3, xlim = c(-4, 4), ylim = c(0,0.9), col = 'red', xlab = 'Standardized ADOS', ylab = 'Density')
+par(new = TRUE)
+dens(d3$sADOS, xlim = c(-4, 4),ylim = c(0,0.9),xlab = 'Standardized ADOS', ylab = 'Density')
+```
+
+
+4. Let's discuss contents:
+4.1. You have three scores for IQ, do they show shared variance? Is that the same in TD and ASD? What does that tell us about IQ?
+4.2. You have explored the relation between IQ and ADOS. How do you explain that relation from a cognitive perspective? N.B. You can present alternative hypotheses.
+
+```{r}
+plot(d3$svIQ ~ d3$ssIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Social IQ')
+plot(d3$svIQ ~ d3$snIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Nonverbal IQ')
+plot(d3$snIQ ~ d3$ssIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Nonverbal IQ', ylab = 'Social IQ')
+
+ggplot(data = d3, aes(svIQ, snIQ))+geom_point(aes(color = d3$ASD))
+ggplot(data = d3, aes(svIQ, ssIQ))+geom_point(aes(color = d3$ASD))
+ggplot(data = d3, aes(ssIQ, snIQ))+geom_point(aes(color = d3$ASD))
+
+```
+
+
+5. Bonus questions: Including measurement errors. 
+5.1. Let's assume that ADOS has a measurement error of 1. How would you model that in any of the previous models? 
+5.2. We know that IQ has an estimated measurement error of 2.12. How would you include that? 
+
+```{r}
+
+```
+
