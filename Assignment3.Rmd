@@ -168,12 +168,12 @@ ggplot(d, aes(VerbalIQ, ADOS))+ #ggplot version
 2.2. Build the model, assess its quality, write a few lines interpreting the results.
 
 ```{r}
-#Scatter plots of the IQ against one another
+#Scatter plots of the IQ against one another. This can be used to eye ball correlation
 plot(d$svIQ ~ d$ssIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Social IQ')
 plot(d$svIQ ~ d$snIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Nonverbal IQ')
 plot(d$snIQ ~ d$ssIQ, data = d, col = col.alpha(rangi2,0.5), xlab = 'Nonverbal IQ', ylab = 'Social IQ')
 
-#Densities of the IQs
+#Densities of the IQs, to see how they overlap
 dens(d$svIQ, xlim = c(-3,3), ylim = c(0,0.75), col = 'red', xlab = 'Z-scored IQs', ylab = 'Density')
 par(new = TRUE)
 dens(d$snIQ, xlim = c(-3, 3), ylim = c(0,0.75), col = 'blue', xlab = 'Z-scored IQs', ylab = 'Density')
@@ -250,9 +250,26 @@ plot(d3$svIQ ~ d3$ssIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Verbal I
 plot(d3$svIQ ~ d3$snIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Verbal IQ', ylab = 'Nonverbal IQ')
 plot(d3$snIQ ~ d3$ssIQ, data = d3, col = col.alpha(rangi2,0.5), xlab = 'Nonverbal IQ', ylab = 'Social IQ')
 
-ggplot(data = d3, aes(svIQ, snIQ))+geom_point(aes(color = d3$ASD))
-ggplot(data = d3, aes(svIQ, ssIQ))+geom_point(aes(color = d3$ASD))
-ggplot(data = d3, aes(ssIQ, snIQ))+geom_point(aes(color = d3$ASD))
+#vn
+ggplot(data = d3, aes(svIQ, snIQ, color = ASD))+geom_point()+
+  labs(x = "Z-scored verbal IQ", y = "Z-scored nonverbal IQ")+
+  scale_color_manual(labels = c("TD", "ASD"), values = c("steelblue3", "orange2"), name = "Diagnosis")
+
+#vs
+ggplot(data = d3, aes(svIQ, ssIQ))+geom_point(aes(color = d3$ASD))+
+  labs(x = "Z-scored verbal IQ", y = "Z-scored social IQ")+
+  scale_color_manual(labels = c("TD", "ASD"), values = c("steelblue3", "orange2"), name = "Diagnosis")
+
+#sn
+ggplot(data = d3, aes(ssIQ, snIQ))+geom_point(aes(color = d3$ASD))+
+  labs(x = "Z-scored social IQ", y = "Z-scored nonverbal IQ")+
+  scale_color_manual(labels = c("TD", "ASD"), values = c("steelblue3", "orange2"), name = "Diagnosis")
+
+dens(d3$svIQ, xlim = c(-3.5,4), ylim = c(0,0.75), col = 'red', xlab = 'Z-scored IQs', ylab = 'Density')
+par(new = TRUE)
+dens(d3$snIQ, xlim = c(-3.5,4), ylim = c(0,0.75), col = 'blue', xlab = 'Z-scored IQs', ylab = 'Density')
+par(new = TRUE)
+dens(d3$ssIQ, xlim = c(-3.5,4), ylim = c(0,0.75), col = 'green', xlab = 'Z-scored IQs', ylab = 'Density')
 
 ```
 
